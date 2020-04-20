@@ -95,7 +95,8 @@ int FtpServer::handleFTP()
     }
 
     // allow only one connection at a time
-    if (ftpServer.hasClient()) {
+    if (ftpServer.hasClient()) 
+    {
         client.stop();
 	    client = ftpServer.available();
     }
@@ -113,7 +114,7 @@ int FtpServer::handleFTP()
         abortTransfer();
         iniVariables();
 
-	    log_i("Ftp server waiting for connection on port "+ String(FTP_CTRL_PORT));
+	    log_i("Ftp server waiting for connection on port %u", FTP_CTRL_PORT);
         
         cmdStatus = CmdStatus::IDLE;
     }
@@ -124,6 +125,8 @@ int FtpServer::handleFTP()
             clientConnected();      
             millisEndConnection = millis() + 10 * 1000 ;                // wait client id during 10 s.
             cmdStatus = CmdStatus::STANDBY;
+
+            log_d("Client connected!");
         }
     }
     else if( readChar() > 0 )                                           // got response
@@ -146,22 +149,22 @@ int FtpServer::handleFTP()
                 cmdStatus = CmdStatus::READY;
                 millisEndConnection = millis() + millisTimeOut;
             }
+            else
+            {
+                cmdStatus = CmdStatus::DISCONNECT;
+            }
         }
-        else
+        else if( cmdStatus == CmdStatus::READY )       // Ftp server waiting for user command
         {
-            cmdStatus = CmdStatus::DISCONNECT;
-        }
-    }
-    else if( cmdStatus == CmdStatus::READY )       // Ftp server waiting for user command
-    {
-        if( ! processCommand())
-        {
-            cmdStatus = CmdStatus::DISCONNECT;
-        }
-        else
-        {
-            millisEndConnection = millis() + millisTimeOut;
-        }    
+            if( ! processCommand())
+            {
+                cmdStatus = CmdStatus::DISCONNECT;
+            }
+            else
+            {
+                millisEndConnection = millis() + millisTimeOut;
+            }
+        }  
     }
     else if (!client.connected() || !client)
     {
@@ -218,12 +221,13 @@ void FtpServer::disconnectClient()
 
 boolean FtpServer::userIdentity()
 {	
+    log_d("User cmd \"%s\" data \"%s\"", command, parameters);
+
     if( strcmp( command, "USER" ))
     {
         client.println( "500 Syntax error");
     }
-
-    if( strcmp( parameters, m_User.c_str() ))
+    else if( strcmp( parameters, m_User.c_str() ))
     {
         client.println( "530 user not found");
     }
@@ -240,6 +244,8 @@ boolean FtpServer::userIdentity()
 
 boolean FtpServer::userPassword()
 {
+    log_d("User cmd \"%s\" data \"%s\"", command, parameters);
+
     if( strcmp( command, "PASS" ))
     {
         client.println( "500 Syntax error");
@@ -272,6 +278,8 @@ boolean FtpServer::processCommand()
     //      ACCESS CONTROL COMMANDS      //
     //                                   //
     ///////////////////////////////////////
+
+    log_d("cmd \"%s\"", command);
 
     //
     //  CDUP - Change to Parent Directory 
@@ -317,12 +325,12 @@ boolean FtpServer::processCommand()
             {
                 strcpy(cwdName, dir.c_str());
                 client.println( "250 CWD Ok. Current directory is \"" + String(dir) + "\"");
-                log_i( "250 CWD Ok. Current directory is \"" + String(dir) + "\"");
+                log_i("250 CWD Ok. Current directory is \"%s\"", dir.c_str());
             }
             else
             {
                 client.println( "550 directory or file does not exist \"" + String(parameters) + "\"");
-                log_i( "550 directory or file does not exist \"" + String(parameters) + "\"");
+                log_i( "550 directory or file does not exist \"%s\"", parameters);
             }
         }
     
@@ -381,7 +389,7 @@ boolean FtpServer::processCommand()
 	    dataPort = FTP_DATA_PORT_PASV;
 
     	log_i("Connection management set to passive");
-        log_i( "Data port set to " + String(dataPort));
+        log_i( "Data port set to %u", dataPort);
    
         client.println( "227 Entering Passive Mode ("+ String(dataIp[0]) + "," + String(dataIp[1])+","+ String(dataIp[2])+","+ String(dataIp[3])+","+String( dataPort >> 8 ) +","+String ( dataPort & 255 )+").");
         dataPassiveConn = true;
@@ -1036,8 +1044,8 @@ int8_t FtpServer::readChar()
                     else
                     {
                         strcpy( command, cmdLine );
-                        iCL = 0;
                     }
+                    iCL = 0;
                 }
             }
         }

@@ -6,10 +6,13 @@
 const char* ssid = "blablabla..."; //WiFi SSID
 const char* password = "blablabla..."; //WiFi Password
 
+
 FtpServer ftpSrv;   //set #define FTP_DEBUG in ESP32FtpServer.h to see ftp verbose on serial
 
 void setup(void){
   Serial.begin(115200);
+  SPI.begin(18, 19, 23);
+
   WiFi.begin(ssid, password);
   Serial.println("");
 
@@ -24,9 +27,8 @@ void setup(void){
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  /////FTP Setup, ensure SD is started before ftp;  /////////
-  
-    if (SD.begin()) 
+    /////FTP Setup, ensure SD is started before ftp;  /////////
+    if (SD.begin(13)) 
     {
         Serial.println("SD opened!");
 
@@ -57,4 +59,5 @@ void setup(void){
 
 void loop(void){
   ftpSrv.handleFTP();        //make sure in loop you call handleFTP()!!   
+  delay(10);
 }
