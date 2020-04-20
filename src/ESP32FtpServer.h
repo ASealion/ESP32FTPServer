@@ -1,4 +1,3 @@
-
 /*
 *  FTP SERVER FOR ESP8266
  * based on FTP Serveur for Arduino Due and Ethernet shield (W5100) or WIZ820io (W5200)
@@ -33,9 +32,8 @@
 #ifndef FTP_SERVERESP_H
 #define FTP_SERVERESP_H
 
-//#include "Streaming.h"
-#include "SD.h"
 #include <FS.h>
+#include <SD.h>
 #include <WiFiClient.h>
 
 #define FTP_SERVER_VERSION "FTP-2016-01-14"
@@ -55,10 +53,12 @@ class FtpServer
 {
 public:
 
-  FtpServer();
-  void    begin(String uname, String pword);
-  int     handleFTP();
-  uint8_t isConnected();
+    FtpServer();
+
+    bool    begin(String uname, String pword, fs::FS &fs = SD);
+
+    int     handleFTP();
+    uint8_t isConnected();
 
 private:
   void    iniVariables();
@@ -83,7 +83,8 @@ private:
   WiFiClient client;
   WiFiClient data;
 
-  File file;
+    fs::FS      *m_fs;                  // pointer to the used file system
+    File        m_file;                 //
 
   boolean  dataPassiveConn;
   uint16_t dataPort;
@@ -94,13 +95,13 @@ private:
   boolean  rnfrCmd;                   // previous command was RNFR
   char *   parameters;                // point to begin of parameters sent by client
   uint16_t iCL;                       // pointer to cmdLine next incoming char
-  int8_t   cmdStatus,                 // status of ftp command connexion
+  int8_t   cmdStatus,                 // status of ftp command connection
            transferStatus;            // status of ftp data transfer
   uint32_t millisTimeOut,             // disconnect after 5 min of inactivity
            millisDelay,
            millisEndConnection,       //
            millisBeginTrans,          // store time of beginning of a transaction
-           bytesTransfered;           //
+           bytesTransferred;          //
   String   _FTP_USER;
   String   _FTP_PASS;
 

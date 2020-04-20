@@ -19,16 +19,13 @@
  */
 //  2017: modified by @robo8080
 //  2019: modified by @HenrikSte
+//  2020: modified by @EnRav
 
 #include "ESP32FtpServer.h"
 
 #include <WiFi.h>
 #include <WiFiClient.h>
 //#include <ESP32WebServer.h>
-#include <FS.h>
-//#include "SD.h"
-#include "SD.h"
-#include "SPI.h"
 
 #define FTP_DEBUG
 
@@ -41,34 +38,14 @@ FtpServer::FtpServer()
 
 }
 
-void FtpServer::begin(String uname, String pword)
+bool FtpServer::begin(String uname, String pword, fs::FS &fs)
 {
-  // Tells the ftp server to begin listening for incoming connection
+    // Tells the ftp server to begin listening for incoming connection
 	_FTP_USER=uname;
 	_FTP_PASS = pword;
 
-  if(!SD.begin())
-  {
-      Serial.println("Card Mount Failed");
-      return;
-  }
-  uint8_t cardType = SD.cardType();
-
-  if(cardType == CARD_NONE){
-      Serial.println("No SD card attached");
-      return;
-  }
-
-  Serial.print("SD Card Type: ");
-  if(cardType == CARD_MMC){
-      Serial.println("MMC");
-  } else if(cardType == CARD_SD){
-      Serial.println("SDSC");
-  } else if(cardType == CARD_SDHC){
-      Serial.println("SDHC");
-  } else {
-      Serial.println("UNKNOWN");
-}
+    // tell the server where the files come from
+    m_fs = &fs; 
 
 	ftpServer.begin();
 	delay(10);
@@ -78,6 +55,8 @@ void FtpServer::begin(String uname, String pword)
 	millisDelay = 0;
 	cmdStatus = 0;
   iniVariables();
+
+  return true;
 }
 
 void FtpServer::iniVariables()
@@ -291,7 +270,7 @@ boolean FtpServer::processCommand()
           dir = String(cwdName) +"/" + parameters;
         }        
 
-        if (SD.exists(dir))
+        if (m_fs->exists(dir)) 
         {
           strcpy(cwdName, dir.c_str());
           client.println( "250 CWD Ok. Current directory is \"" + String(dir) + "\"");
@@ -432,11 +411,11 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( path ))
     {
-      if( ! SD.exists( path ))
+      if( ! m_fs->exists( path ))
         client.println( "550 File " + String(parameters) + " not found");
       else
       {
-        if( SD.remove( path ))
+        if( m_fs->remove( path ))
           client.println( "250 Deleted " + String(parameters) );
         else
           client.println( "450 Can't delete " + String(parameters));
@@ -454,9 +433,7 @@ boolean FtpServer::processCommand()
     {
       client.println( "150 Accepted data connection");
       uint16_t nm = 0;
-//      Dir dir=SD.openDir(cwdName);
-      File dir=SD.open(cwdName);
-//      if( !SD.exists(cwdName))
+      File dir = m_fs->open(cwdName);
      if((!dir)||(!dir.isDirectory()))
         client.println( "550 Can't open directory " + String(cwdName) );
       else
@@ -498,13 +475,10 @@ boolean FtpServer::processCommand()
     {
 	    client.println( "150 Accepted data connection");
       uint16_t nm = 0;
-//      Dir dir= SD.openDir(cwdName);
-      File dir= SD.open(cwdName);
+      File dir= m_fs->open(cwdName);
       //char dtStr[ 15 ];
-    //  if(!SD.exists(cwdName))
      if((!dir)||(!dir.isDirectory()))
         client.println( "550 Can't open directory " +String(cwdName) );
-//        client.println( "550 Can't open directory " +String(parameters) );
       else
       {
 //        while( dir.next())
@@ -545,9 +519,8 @@ boolean FtpServer::processCommand()
     {
       client.println( "150 Accepted data connection");
       uint16_t nm = 0;
-//      Dir dir=SD.openDir(cwdName);
-      File dir= SD.open(cwdName);
-      if( !SD.exists( cwdName ))
+      File dir= m_fs->open(cwdName);
+      if( !m_fs->exists( cwdName ))
         client.println( "550 Can't open directory " + String(parameters));
       else
       {
@@ -583,10 +556,10 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( path ))
 	{
-		file = SD.open(path, "r");
-      if( !file)
+		m_file = m_fs->open(path, "r");
+      if( !m_file)
         client.println( "550 File " +String(parameters)+ " not found");
-      else if( !file )
+      else if( !m_file )
         client.println( "450 Can't open " +String(parameters));
       else if( ! dataConnect())
         client.println( "425 No data connection");
@@ -596,9 +569,9 @@ boolean FtpServer::processCommand()
 		  Serial.println("Sending " + String(parameters));
         #endif
         client.println( "150-Connected to port "+ String(dataPort));
-        client.println( "150 " + String(file.size()) + " bytes to download");
+        client.println( "150 " + String(m_file.size()) + " bytes to download");
         millisBeginTrans = millis();
-        bytesTransfered = 0;
+        bytesTransferred = 0;
         transferStatus = 1;
       }
     }
@@ -613,13 +586,13 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( path ))
     {
-		  file = SD.open(path, "w");
-      if( !file)
+		  m_file = m_fs->open(path, "w");
+      if( !m_file)
         client.println( "451 Can't open/create " +String(parameters) );
       else if( ! dataConnect())
       {
         client.println( "425 No data connection");
-        file.close();
+        m_file.close();
       }
       else
       {
@@ -628,7 +601,7 @@ boolean FtpServer::processCommand()
         #endif
         client.println( "150 Connected to port " + String(dataPort));
         millisBeginTrans = millis();
-        bytesTransfered = 0;
+        bytesTransferred = 0;
         transferStatus = 2;
       }
     }
@@ -713,7 +686,7 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( buf ))
     {
-      if( ! SD.exists( buf ))
+      if( ! m_fs->exists( buf ))
         client.println( "550 File " +String(parameters)+ " not found");
       else
       {
@@ -738,14 +711,14 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( path ))
     {
-      if( SD.exists( path ))
+      if( m_fs->exists( path ))
         client.println( "553 " +String(parameters)+ " already exists");
       else
       {          
             #ifdef FTP_DEBUG
 		  Serial.println("Renaming " + String(buf) + " to " + String(path));
             #endif
-            if( SD.rename( buf, path ))
+            if( m_fs->rename( buf, path ))
               client.println( "250 File successfully renamed or moved");
             else
 				client.println( "451 Rename/move failure");
@@ -788,13 +761,13 @@ boolean FtpServer::processCommand()
       client.println( "501 No file name");
     else if( makePath( path ))
 	{
-		file = SD.open(path, "r");
-      if(!file)
+		m_file = m_fs->open(path, "r");
+      if(!m_file)
          client.println( "450 Can't open " +String(parameters) );
       else
       {
-        client.println( "213 " + String(file.size()));
-        file.close();
+        client.println( "213 " + String(m_file.size()));
+        m_file.close();
       }
     }
   }
@@ -844,11 +817,11 @@ boolean FtpServer::dataConnect()
 boolean FtpServer::doRetrieve()
 {
 	//int16_t nb = file.readBytes((uint8_t*) buf, FTP_BUF_SIZE );
-	int16_t nb = file.readBytes(buf, FTP_BUF_SIZE);
+	int16_t nb = m_file.readBytes(buf, FTP_BUF_SIZE);
   if( nb > 0 )
   { 
     data.write((uint8_t*) buf, nb );
-    bytesTransfered += nb;
+    bytesTransferred += nb;
     return true;
   }
   closeTransfer();
@@ -869,7 +842,7 @@ boolean FtpServer::doStore()
     {
       // Serial.println( millis() << " " << nb << endl;
       //Serial.print("SD=");
-      size_t written = file.write((uint8_t*) buf, nb );
+      size_t written = m_file.write((uint8_t*) buf, nb );
       /*
       unsigned long ms2 = millis();
       Serial.print(ms2-ms1);
@@ -878,7 +851,7 @@ boolean FtpServer::doStore()
       Serial.print("w=");
       Serial.println(written);
       */
-      bytesTransfered += nb;
+      bytesTransferred += nb;
     }
     else
     {
@@ -893,15 +866,15 @@ boolean FtpServer::doStore()
 void FtpServer::closeTransfer()
 {
   uint32_t deltaT = (int32_t) ( millis() - millisBeginTrans );
-  if( deltaT > 0 && bytesTransfered > 0 )
+  if( deltaT > 0 && bytesTransferred > 0 )
   {
     client.println( "226-File successfully transferred");
-    client.println( "226 " + String(deltaT) + " ms, "+ String(bytesTransfered / deltaT) + " kbytes/s");
+    client.println( "226 " + String(deltaT) + " ms, "+ String(bytesTransferred / deltaT) + " kbytes/s");
   }
   else
     client.println( "226 File successfully transferred");
   
-  file.close();
+  m_file.close();
   data.stop();
 }
 
@@ -909,7 +882,7 @@ void FtpServer::abortTransfer()
 {
   if( transferStatus > 0 )
   {
-    file.close();
+    m_file.close();
     data.stop(); 
     client.println( "426 Transfer aborted"  );
     #ifdef FTP_DEBUG

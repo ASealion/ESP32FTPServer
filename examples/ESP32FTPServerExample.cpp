@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <SD.h>
 #include "ESP32FtpServer.h"
 
 const char* ssid = "blablabla..."; //WiFi SSID
@@ -25,8 +26,31 @@ void setup(void){
 
   /////FTP Setup, ensure SD is started before ftp;  /////////
   
-  if (SD.begin()) {
-      Serial.println("SD opened!");
+    if (SD.begin()) 
+    {
+        Serial.println("SD opened!");
+
+    if(!SD.begin())
+    {
+        Serial.println("Card Mount Failed");
+    }
+    uint8_t cardType = SD.cardType();
+
+    if(cardType == CARD_NONE){
+        Serial.println("No SD card attached");
+    }
+
+    Serial.print("SD Card Type: ");
+    if(cardType == CARD_MMC){
+        Serial.println("MMC");
+    } else if(cardType == CARD_SD){
+        Serial.println("SDSC");
+    } else if(cardType == CARD_SDHC){
+        Serial.println("SDHC");
+    } else {
+        Serial.println("UNKNOWN");
+    }
+
       ftpSrv.begin("esp32","esp32");    //username, password for ftp.  set ports in ESP32FtpServer.h  (default 21, 50009 for PASV)
   }    
 }
