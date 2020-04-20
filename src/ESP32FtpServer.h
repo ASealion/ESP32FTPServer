@@ -36,9 +36,9 @@
 #include <SD.h>
 #include <WiFiClient.h>
 
-#define FTP_SERVER_VERSION "FTP-2016-01-14"
+#define FTP_SERVER_VERSION "0.1.0"
 
-#define FTP_CTRL_PORT    21          // Command port on wich server is listening
+#define FTP_CTRL_PORT    21          // Command port on which server is listening
 #define FTP_DATA_PORT_PASV 50009     // Data port in passive mode
 
 #define FTP_TIME_OUT  5           // Disconnect client after 5 minutes of inactivity
@@ -54,30 +54,44 @@ class FtpServer
 public:
 
     FtpServer();
+    ~FtpServer();
 
+    /**
+     * @brief
+     * 
+     * */
     bool    begin(String uname, String pword, fs::FS &fs = SD);
 
+    /** 
+     * @brief
+     * 
+     * */
     int     handleFTP();
+
+    /**
+     * @brief
+     * 
+     * */
     uint8_t isConnected();
 
 private:
-  void    iniVariables();
-  void    clientConnected();
-  void    disconnectClient();
-  boolean userIdentity();
-  boolean userPassword();
-  boolean processCommand();
-  boolean dataConnect();
-  boolean doRetrieve();
-  boolean doStore();
-  void    closeTransfer();
-  void    abortTransfer();
-  boolean makePath( char * fullname );
-  boolean makePath( char * fullName, char * param );
-  uint8_t getDateTime( uint16_t * pyear, uint8_t * pmonth, uint8_t * pday,
-                       uint8_t * phour, uint8_t * pminute, uint8_t * second );
-  char *  makeDateTimeStr( char * tstr, uint16_t date, uint16_t time );
-  int8_t  readChar();
+    void    iniVariables();
+    void    clientConnected();
+    void    disconnectClient();
+    boolean userIdentity();
+    boolean userPassword();
+    boolean processCommand();
+    boolean dataConnect();
+    boolean doRetrieve();
+    boolean doStore();
+    void    closeTransfer();
+    void    abortTransfer();
+    boolean makePath( char * fullname );
+    boolean makePath( char * fullName, char * param );
+    uint8_t getDateTime( uint16_t * pyear, uint8_t * pmonth, uint8_t * pday,
+                         uint8_t * phour, uint8_t * pminute, uint8_t * second );
+    char *  makeDateTimeStr( char * tstr, uint16_t date, uint16_t time );
+    int8_t  readChar();
 
   IPAddress      dataIp;              // IP address of client for data
   WiFiClient client;
@@ -95,15 +109,23 @@ private:
   boolean  rnfrCmd;                   // previous command was RNFR
   char *   parameters;                // point to begin of parameters sent by client
   uint16_t iCL;                       // pointer to cmdLine next incoming char
-  int8_t   cmdStatus,                 // status of ftp command connection
-           transferStatus;            // status of ftp data transfer
+
+    enum class CmdStatus {
+        DISCONNECT,                     // 0
+        PREPARATION,                    // 1
+        IDLE,                           // 2
+        STANDBY,                        // 3
+        AUTHENTICATE,
+        READY,            
+    }           cmdStatus;
+  int8_t   transferStatus;            // status of ftp data transfer
   uint32_t millisTimeOut,             // disconnect after 5 min of inactivity
            millisDelay,
            millisEndConnection,       //
            millisBeginTrans,          // store time of beginning of a transaction
            bytesTransferred;          //
-  String   _FTP_USER;
-  String   _FTP_PASS;
+  String   m_User;
+  String   m_Password;
 
 
 
