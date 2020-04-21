@@ -209,14 +209,14 @@ void FtpServer::clientConnected()
     iCL = 0;
 }
 
+
 void FtpServer::disconnectClient()
 {
-  #ifdef FTP_DEBUG
-	Serial.println(" Disconnecting client");
-  #endif
-  abortTransfer();
-  client.println("221 Goodbye");
-  client.stop();
+    log_i(" Disconnecting client");
+
+    abortTransfer();
+    client.println("221 Goodbye");
+    client.stop();
 }
 
 boolean FtpServer::userIdentity()
@@ -728,10 +728,9 @@ boolean FtpServer::processCommand()
                 m_file.close();
             }
             else
-            {
-                #ifdef FTP_DEBUG
-                Serial.println( "Receiving " +String(parameters));
-                #endif
+            {                
+                log_d( "Receiving %s", parameters);
+             
                 client.println( "150 Connected to port " + String(dataPort));
                 millisBeginTrans = millis();
                 bytesTransferred = 0;
@@ -975,7 +974,6 @@ boolean FtpServer::doRetrieve()
 }
 
 
-//unsigned long count = 0;
 boolean FtpServer::doStore()
 {
     if (data.connected())
