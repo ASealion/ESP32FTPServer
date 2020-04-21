@@ -285,13 +285,24 @@ boolean FtpServer::processCommand()
     //  CDUP - Change to Parent Directory 
     //
     if( ! strcmp( command, "CDUP" ))
-    {        
+    {   
+        log_d("Actual directory \"%s\"", cwdName);
+
         //if we are not in the root directory
         if (strcmp(cwdName, "/"))
         {
+            uint32_t length = strlen(cwdName);
 
-            int todo_move_one_directory_up;
+            while((length) && (cwdName[length] != '/'))
+            {
+                --length;
+            }
+
+            cwdName[length] = '\0';
         }
+
+        log_d("New directory \"%s\"", cwdName);
+
 	    client.println("250 Ok. Current directory is \"" + String(cwdName) + "\"");
     }
 
@@ -963,29 +974,31 @@ boolean FtpServer::doRetrieve()
     return false;
 }
 
-unsigned long count = 0;
+
+//unsigned long count = 0;
 boolean FtpServer::doStore()
 {
     if (data.connected())
     {
-        unsigned long ms0 = millis();
-        //Serial.print("Transfer=");
-        int16_t nb = data.readBytes((uint8_t *)buf, FTP_BUF_SIZE);
-        //unsigned long ms1 = millis();
-        //Serial.print(ms1-ms0);
+        uint32_t readCount = data.available() ;
+
+        // do not read more bytes than available
+        if (readCount > FTP_BUF_SIZE)
+        {
+            readCount = FTP_BUF_SIZE;
+        };
+        
+        size_t nb = data.readBytes((uint8_t *)buf, readCount);
+
         if (nb > 0)
         {
-            // Serial.println( millis() << " " << nb << endl;
-            //Serial.print("SD=");
             size_t written = m_file.write((uint8_t *)buf, nb);
-            /*
-      unsigned long ms2 = millis();
-      Serial.print(ms2-ms1);
-      Serial.print("nb=");
-      Serial.print(nb);
-      Serial.print("w=");
-      Serial.println(written);
-      */
+
+            if (written != nb)
+            {
+                log_e("Bytes written (%d) differs from available bytes (%d)", written, nb);
+            }
+
             bytesTransferred += nb;
         }
         else
@@ -1007,7 +1020,9 @@ void FtpServer::closeTransfer()
         client.println("226 " + String(deltaT) + " ms, " + String(bytesTransferred / deltaT) + " kbytes/s");
     }
     else
+    {
         client.println("226 File successfully transferred");
+    }
 
     m_file.close();
     data.stop();
@@ -1020,9 +1035,7 @@ void FtpServer::abortTransfer()
         m_file.close();
         data.stop();
         client.println("426 Transfer aborted");
-#ifdef FTP_DEBUG
-        Serial.println("Transfer aborted!");
-#endif
+        log_w("Transfer aborted!");
     }
     transferStatus = 0;
 }
