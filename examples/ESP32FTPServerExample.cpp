@@ -6,10 +6,14 @@
 const char *ssid = "blablabla...";     //WiFi SSID
 const char *password = "blablabla..."; //WiFi Password
 
+
 FtpServer ftpSrv; //set #define FTP_DEBUG in ESP32FtpServer.h to see ftp verbose on serial
 
 void setup(void)
 {
+    pinMode(21, OUTPUT); 
+    digitalWrite(21, HIGH);
+
     Serial.begin(115200);
     SPI.begin(18, 19, 23);
 
@@ -39,12 +43,8 @@ void setup(void)
     /////FTP Setup, ensure SD is started before ftp;  /////////
     if (SD.begin(13)) 
     {
-        Serial.println("SD opened!");
+    Serial.println("SD opened!");
 
-    if (!SD.begin())
-    {
-        Serial.println("Card Mount Failed");
-    }
     uint8_t cardType = SD.cardType();
 
     if (cardType == CARD_NONE){

@@ -1,5 +1,5 @@
 /*
- * FTP Serveur for ESP8266
+ * FTP Serveur for ESP8266 / ESP32
  * based on FTP Serveur for Arduino Due and Ethernet shield (W5100) or WIZ820io (W5200)
  * based on Jean-Michel Gallego's work
  * modified to work with esp8266 SPIFFS by David Paiva david@nailbuster.com
@@ -30,10 +30,9 @@
 #define FTP_DEBUG
 
 
-WiFiServer ftpServer( FTP_CTRL_PORT );
-WiFiServer dataServer( FTP_DATA_PORT_PASV );
-
-FtpServer::FtpServer()
+FtpServer::FtpServer():
+    m_pCommandServer(NULL),
+    m_pDataServer(NULL)
 {
 
 }
@@ -41,29 +40,56 @@ FtpServer::FtpServer()
 
 FtpServer::~FtpServer()
 {
+    if (m_pCommandServer) 
+    {
+        delete m_pCommandServer;
+        m_pCommandServer = NULL;
+    }
 
+    if (m_pDataServer) 
+    {
+        delete m_pDataServer;
+        m_pDataServer = NULL;
+    }
 }
 
 
 bool FtpServer::begin(String uname, String pword, fs::FS &fs)
 {
-    bool result = true;
+    bool result = false;
 
-    // Tells the ftp server to begin listening for incoming connection
-	m_User      = uname;
-	m_Password  = pword;
+    if (m_pDataServer == NULL)
+    {
+        m_pDataServer = new WiFiServer(FTP_DATA_PORT_PASV);
+    }
 
-    // tell the server where the files come from
-    m_fs = &fs; 
+    if (m_pCommandServer == NULL)
+    {
+        m_pCommandServer = new WiFiServer(FTP_CTRL_PORT);
+    }
 
-	ftpServer.begin();
-	delay(10);
-	dataServer.begin();
-	delay(10);
-	millisTimeOut = (uint32_t)FTP_TIME_OUT * 60 * 1000;
-	millisDelay = 0;
-	cmdStatus = CmdStatus::DISCONNECT;
-    iniVariables();
+    if ((m_pCommandServer) && (m_pDataServer))
+    {
+        // Tells the ftp server to begin listening for incoming connection
+        m_User      = uname;
+        m_Password  = pword;
+
+        // tell the server where the files come from
+        m_fs = &fs; 
+
+        m_pCommandServer->begin();
+        delay(10);
+
+        m_pDataServer->begin();
+        delay(10);
+
+        millisTimeOut = (uint32_t)FTP_TIME_OUT * 60 * 1000;
+        millisDelay = 0;
+        cmdStatus = CmdStatus::DISCONNECT;
+        iniVariables();
+
+        result = true;
+    }
 
     return result;
 }
@@ -82,7 +108,6 @@ void FtpServer::iniVariables()
 
   rnfrCmd = false;
   transferStatus = 0;
-  
 }
 
 
@@ -95,10 +120,10 @@ int FtpServer::handleFTP()
     }
 
     // allow only one connection at a time
-    if (ftpServer.hasClient()) 
+    if ((m_pCommandServer) && (m_pCommandServer->hasClient())) 
     {
         client.stop();
-	    client = ftpServer.available();
+	    client = m_pCommandServer->available();
     }
   
     if( cmdStatus == CmdStatus::DISCONNECT )
@@ -286,8 +311,6 @@ boolean FtpServer::processCommand()
     //
     if( ! strcmp( command, "CDUP" ))
     {   
-        log_d("Actual directory \"%s\"", cwdName);
-
         //if we are not in the root directory
         if (strcmp(cwdName, "/"))
         {
@@ -298,10 +321,18 @@ boolean FtpServer::processCommand()
                 --length;
             }
 
-            cwdName[length] = '\0';
+            if (length)
+            {
+                cwdName[length] = '\0';
+            }
+            else
+            {
+                cwdName[length+1] = '\0';
+            }
+            
         }
 
-        log_d("New directory \"%s\"", cwdName);
+        log_d("CWD \"%s\"", cwdName);
 
 	    client.println("250 Ok. Current directory is \"" + String(cwdName) + "\"");
     }
@@ -938,16 +969,16 @@ boolean FtpServer::dataConnect()
   //wait 5 seconds for a data connection
   if (!data.connected())
   {
-    while (!dataServer.hasClient() && millis() - startTime < 10000)
+    while (!m_pDataServer->hasClient() && millis() - startTime < 10000)
 //    while (!dataServer.available() && millis() - startTime < 10000)
 	  {
 		  //delay(100);
 		  yield();
 	  }
-    if (dataServer.hasClient()) {
+    if (m_pDataServer->hasClient()) {
 //    if (dataServer.available()) {
 		  data.stop();
-		  data = dataServer.available();
+		  data = m_pDataServer->available();
 			#ifdef FTP_DEBUG
 		      Serial.println("ftpdataserver client....");
 			#endif
